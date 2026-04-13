@@ -6,7 +6,7 @@ import {
   MessageSquare, Send, Sparkles, Loader2,
   PieChart as PieChartIcon, Cake, Calendar, Book,
   TrendingUp, TrendingDown, Clock, CheckCircle, XCircle,
-  FileText, History, Wallet, CheckSquare, Users, MessageCircle, Copy, ExternalLink, LogOut
+  FileText, History, Wallet, CheckSquare, Users, MessageCircle, Copy, ExternalLink, LogOut, Shield
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { 
@@ -16,8 +16,10 @@ import { NAV_ITEMS, INITIAL_STUDENTS } from './constants';
 import { analyzeStudent, generateTaskChecklist, chatWithAI, summarizeDiary, draftNotification } from './services/geminiService';
 import StudentCard from './components/StudentCard';
 import Auth from './components/Auth';
-import { auth } from './firebase';
+import AdminDashboard from './components/AdminDashboard';
+import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 const App: React.FC = () => {
   // --- Auth State ---
@@ -25,7 +27,7 @@ const App: React.FC = () => {
   const [authLoading, setAuthLoading] = useState(true);
 
   // --- State ---
-  const [view, setView] = useState<ViewMode>(ViewMode.Dashboard);
+  const [view, setView] = useState<ViewMode | 'Admin'>(ViewMode.Dashboard);
   const [students, setStudents] = useState<Student[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -42,8 +44,22 @@ const App: React.FC = () => {
 
   // --- Persistence ---
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          if (userDoc.exists()) {
+            setUser({ ...currentUser, role: userDoc.data().role, name: userDoc.data().name });
+          } else {
+            setUser({ ...currentUser, role: currentUser.email === 'trandong.asana@gmail.com' ? 'admin' : 'teacher' });
+          }
+        } catch (error) {
+          console.error("Error fetching user role:", error);
+          setUser(currentUser);
+        }
+      } else {
+        setUser(null);
+      }
       setAuthLoading(false);
     });
     return () => unsubscribe();
@@ -259,8 +275,8 @@ const App: React.FC = () => {
   }, [students, transactions, today]);
 
   const filteredStudents = students.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    s.studentId.toLowerCase().includes(searchQuery.toLowerCase())
+    (s.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (s.studentId || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // --- Views ---
@@ -345,6 +361,11 @@ const App: React.FC = () => {
                 {item.icon}{item.label}
               </button>
             ))}
+            {user?.role === 'admin' && (
+              <button onClick={() => { setView('Admin'); setSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-semibold ${view === 'Admin' ? 'bg-purple-600 text-white shadow-lg shadow-purple-100' : 'text-purple-600 hover:bg-purple-50'}`}>
+                <Shield size={20} />Quản trị Admin
+              </button>
+            )}
           </nav>
         </div>
         <div className="absolute bottom-0 left-0 right-0 p-6 border-t">
@@ -352,8 +373,8 @@ const App: React.FC = () => {
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">GV</div>
               <div>
-                <p className="text-sm font-bold">{user?.email?.split('@')[0] || 'Giáo viên'}</p>
-                <p className="text-xs text-gray-500">Lớp 6A1</p>
+                <p className="text-sm font-bold">{user?.name || user?.email?.split('@')[0] || 'Giáo viên'}</p>
+                <p className="text-xs text-gray-500">{user?.role === 'admin' ? 'Quản trị viên' : 'Lớp 6A1'}</p>
               </div>
             </div>
             <button 
@@ -370,11 +391,12 @@ const App: React.FC = () => {
       {/* Main content */}
       <main className="flex-1 md:ml-72 p-4 md:p-8 pt-20 md:pt-8 min-h-screen w-full max-w-7xl mx-auto">
         <header className="flex justify-between items-center mb-8">
-          <div><h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">{NAV_ITEMS.find(i => i.id === view)?.label}</h2><p className="text-sm text-gray-500">Hệ thống Quản lý Lớp học Thông minh 4.0</p></div>
+          <div><h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">{view === 'Admin' ? 'Quản trị hệ thống' : NAV_ITEMS.find(i => i.id === view)?.label}</h2><p className="text-sm text-gray-500">Hệ thống Quản lý Lớp học Thông minh 4.0</p></div>
           <div className="flex items-center gap-3"><div className="hidden md:flex flex-col items-end"><span className="text-xs font-bold text-gray-400 uppercase">Trạng thái</span><span className="text-xs font-bold text-green-500 flex items-center gap-1"><span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> TRỰC TUYẾN</span></div></div>
         </header>
 
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {view === 'Admin' && user?.role === 'admin' && <AdminDashboard />}
           {view === ViewMode.Dashboard && renderDashboard()}
           {view === ViewMode.Students && (
             <div className="space-y-6">

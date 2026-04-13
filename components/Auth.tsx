@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { Book, Mail, Lock, User, AlertCircle } from 'lucide-react';
 
 interface AuthProps {
@@ -24,8 +25,19 @@ const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
-        // In a real app, you might want to save the user's name to Firestore here
-        await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        
+        // Auto-assign admin role to the specific email, otherwise teacher
+        const role = email === 'trandong.asana@gmail.com' ? 'admin' : 'teacher';
+        
+        await setDoc(doc(db, 'users', user.uid), {
+          uid: user.uid,
+          email: user.email,
+          name: name || user.email?.split('@')[0],
+          role: role,
+          createdAt: new Date().toISOString()
+        });
       }
       onSuccess();
     } catch (err: any) {
