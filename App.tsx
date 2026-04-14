@@ -84,6 +84,28 @@ const App: React.FC = () => {
 
   const today = new Date().toISOString().split('T')[0];
 
+  // --- Stats Helpers ---
+  const stats = useMemo(() => {
+    const total = students.length;
+    const vắng = students.filter(s => s.attendance[today] === 'Absent').length;
+    const muộn = students.filter(s => s.attendance[today] === 'Late').length;
+    const present = students.filter(s => s.attendance[today] === 'Present' || !s.attendance[today]).length;
+    const fund = transactions.reduce((acc, tx) => tx.type === 'Income' ? acc + tx.amount : acc - tx.amount, 0);
+    const birthdaysToday = students.filter(s => {
+      if (!s.birthday) return false;
+      const b = new Date(s.birthday);
+      const t = new Date();
+      return b.getDate() === t.getDate() && b.getMonth() === t.getMonth();
+    });
+    const chartData = [...students].sort((a, b) => b.points - a.points).slice(0, 10).map(s => ({ name: s.name, points: s.points }));
+    return { total, vắng, muộn, present, fund, birthdaysToday, chartData };
+  }, [students, transactions, today]);
+
+  const filteredStudents = students.filter(s => 
+    (s.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (s.studentId || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -256,28 +278,6 @@ const App: React.FC = () => {
     alert("Báo cáo tổng kết GVCN AI:\n\n" + summary);
     setIsLoading(false);
   };
-
-  // --- Stats Helpers ---
-  const stats = useMemo(() => {
-    const total = students.length;
-    const vắng = students.filter(s => s.attendance[today] === 'Absent').length;
-    const muộn = students.filter(s => s.attendance[today] === 'Late').length;
-    const present = students.filter(s => s.attendance[today] === 'Present' || !s.attendance[today]).length;
-    const fund = transactions.reduce((acc, tx) => tx.type === 'Income' ? acc + tx.amount : acc - tx.amount, 0);
-    const birthdaysToday = students.filter(s => {
-      if (!s.birthday) return false;
-      const b = new Date(s.birthday);
-      const t = new Date();
-      return b.getDate() === t.getDate() && b.getMonth() === t.getMonth();
-    });
-    const chartData = [...students].sort((a, b) => b.points - a.points).slice(0, 10).map(s => ({ name: s.name, points: s.points }));
-    return { total, vắng, muộn, present, fund, birthdaysToday, chartData };
-  }, [students, transactions, today]);
-
-  const filteredStudents = students.filter(s => 
-    (s.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (s.studentId || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   // --- Views ---
   const renderDashboard = () => (

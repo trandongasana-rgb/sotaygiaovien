@@ -46,8 +46,10 @@ const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
         setError('Lỗi: Đăng nhập bằng Google chưa được bật. Vui lòng vào Firebase Console -> Authentication -> Sign-in method để bật Google.');
       } else if (err.code === 'auth/popup-closed-by-user') {
         setError('Đã hủy đăng nhập.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('Lỗi: Tên miền này chưa được cấp phép. Vui lòng vào Firebase Console -> Authentication -> Settings -> Authorized domains để thêm tên miền này.');
       } else {
-        setError('Có lỗi xảy ra khi đăng nhập bằng Google. Vui lòng thử lại.');
+        setError(`Có lỗi xảy ra khi đăng nhập bằng Google: ${err.message || 'Vui lòng thử lại.'}`);
       }
     } finally {
       setIsLoading(false);
